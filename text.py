@@ -3,6 +3,8 @@ from gymnasium import spaces
 import pygame
 import numpy as np
 import time
+# get a queue of the events
+from collections import deque
 
 class ScreenSaverEnv(gym.Env):
     def __init__(self, canvas_size=(800, 600), frame_size=(100,100),image_path="path_to_image.png", speed=5):
@@ -29,7 +31,11 @@ class ScreenSaverEnv(gym.Env):
         # Coords of the frame that captures the image
         self.frame_coords = np.array([canvas_size[0]//2, canvas_size[1]//2])
         self.frame_size = np.array(frame_size)
-        self
+        self.frame_vel = np.array([0, 0])
+        self.reward = 0
+        
+        # Queue of the events
+        self.events = deque(maxlen=100)
         
         # Initialize pygame
         pygame.init()
@@ -42,6 +48,7 @@ class ScreenSaverEnv(gym.Env):
                                   np.random.randint(0, self.canvas_height - self.image_height)])
         # Reset velocity
         self.velocity = np.array([np.random.choice([-1, 1]), np.random.choice([-1, 1])]) * np.linalg.norm(self.velocity)
+
         
         return self._get_observation(), {}
 
@@ -49,6 +56,11 @@ class ScreenSaverEnv(gym.Env):
         # Update position
         self.apply_velocity()
         self.apply_frame(action)
+        # Calculate reward
+        reward = self.get_reward()
+        self.reward = reward
+        # Add the reward to the queue
+        self.events.append(reward)
         
         # Bounce off the walls
         if self.position[0] <= 0 or self.position[0] + self.image_width >= self.canvas_width:
@@ -57,7 +69,8 @@ class ScreenSaverEnv(gym.Env):
             self.velocity[1] = -self.velocity[1]
         
         # No specific reward; observation only
-        return self._get_observation(), 0, False, False, {}
+        # [Observation, Reward, Done, Trunc, Info]
+        return self._get_observation(), reward, False, False, {}
 
     # Method that apply the velocity to the position with bounce
     def apply_velocity(self):
@@ -68,38 +81,75 @@ class ScreenSaverEnv(gym.Env):
     def apply_frame(self, action):
         # Move the frame coords the action
         acelerations = [(0, 0), (0, 1), (1, 0), (-1, 0), (0, -1)]
-        # Action 1
-        if action == 0:
+        # Check the difference between the frame and the image
+        diff = np.subtract(self.position, self.frame_coords)
+        # Normalize the difference
+        diff = np.divide(diff, np.linalg.norm(diff)) * .2
+        # Make the acceleration to the direction of the image
+        acelerations = [diff for i in range(len(acelerations))]
 
-            np.add(self.frame_coords, velocities[action], out=self.frame_coords, casting="unsafe")
-        # Action 2
-        if action == 1:
-            np.add(self.frame_coords, velocities[action], out=self.frame_coords, casting="unsafe")
-        # Action 3
-        if action == 2:
-            np.add(self.frame_coords, velocities[action], out=self.frame_coords, casting="unsafe")
-        # Action 4
-        if action == 3:
-            np.add(self.frame_coords, velocities[action], out=self.frame_coords, casting="unsafe")
-        # Action 5
-        if action == 4:
-            np.add(self.frame_coords, velocities[action], out=self.frame_coords, casting="unsafe")
-        
-        # Apply the frame to the position
-        self.position = np.add(self.position, self.frame_coords, casting="unsafe")
+        # Add the action to the frame velocity
+        self.frame_vel = np.add(self.frame_vel, acelerations[action], casting="unsafe")
+        # Check bounds
+        if self.frame_coords[0] <= 0 or self.frame_coords[0] + self.frame_size[0] >= self.canvas_width:
+            self.frame_vel[0] = -self.frame_vel[0]
+        if self.frame_coords[1] <= 0 or self.frame_coords[1] + self.frame_size[1] >= self.canvas_height:
+            self.frame_vel[1] = -self.frame_vel[1]
+        # Update position
+        np.add(self.frame_coords, self.frame_vel, out=self.frame_coords, casting="unsafe")
 
         
     def _get_observation(self):
+        # [Observation Format]: [Screen, Position, Velocity, Lebron Position, Lebron Velocity]
         # Render the current frame as an observation
         self.screen.fill((0, 0, 0))  # Clear screen with black
         self.screen.blit(self.image, self.position)  # Draw image at current position
         # Now add a hollow rectangle around the image as the frame
         pygame.draw.rect(self.screen, (255, 255, 255), (*self.frame_coords, self.image_width, self.image_height), 1)
         pygame.display.flip()  # Update display
+        # Display the porcentage of the image inside the frame
+        font = pygame.font.Font(None, 36)
+        text = font.render(f"Reward: {self.reward:.2f}", True, (255, 255, 255))
+        self.screen.blit(text, (10, 10))
+        # Get the positions and velocities
+        # Get the position of the image
+        position = self.position
+        # Get the velocity of the image
+        velocity = self.velocity
+        # Get the position of the frame
+        frame_position = self.frame_coords
+        # Get the velocity of the frame
+        frame_velocity = self.frame_vel
+        # Concatenate the positions and velocities
+        observation = np.concatenate([position, velocity, frame_position, frame_velocity])
         
         # Convert the pygame screen to a numpy array
         frame = pygame.surfarray.array3d(self.screen)
-        return np.transpose(frame, (1, 0, 2))  # Transpose to match Gym's (H, W, C) format
+        return (np.transpose(frame, (1, 0, 2)),observation)  # Transpose to match Gym's (H, W, C) format
+    
+    # The reward function
+    def get_reward(self):
+        # Check the porcentage of the image inside the frame
+        # Get the area of the image
+        image_area = self.image_width * self.image_height
+        # Get the area of the frame
+        frame_area = self.frame_size[0] * self.frame_size[1]
+        # Get the intersection area
+        intersection_area = max(0, min(self.frame_coords[0] + self.frame_size[0], self.position[0] + self.image_width) - max(self.frame_coords[0], self.position[0])) * max(0, min(self.frame_coords[1] + self.frame_size[1], self.position[1] + self.image_height) - max(self.frame_coords[1], self.position[1]))
+        # Get the union area
+        union_area = image_area + frame_area - intersection_area
+        # Get the percentage of the image inside the frame
+        percentage = intersection_area / union_area
+        # Return the percentage
+        return percentage
+    
+    # The done function
+    def done(self):
+        if np.mean(self.events) > 0.5:
+            return True
+        else:
+            return False
+        
 
     def render(self, mode="human"):
         if mode == "human":
