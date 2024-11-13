@@ -81,12 +81,6 @@ class ScreenSaverEnv(gym.Env):
     def apply_frame(self, action):
         # Move the frame coords the action
         acelerations = [(0, 0), (0, 1), (1, 0), (-1, 0), (0, -1)]
-        # Check the difference between the frame and the image
-        diff = np.subtract(self.position, self.frame_coords)
-        # Normalize the difference
-        diff = np.divide(diff, np.linalg.norm(diff)) * .2
-        # Make the acceleration to the direction of the image
-        acelerations = [diff for i in range(len(acelerations))]
 
         # Add the action to the frame velocity
         self.frame_vel = np.add(self.frame_vel, acelerations[action], casting="unsafe")
@@ -162,17 +156,18 @@ class ScreenSaverEnv(gym.Env):
     def close(self):
         pygame.quit()
 
-# Example usage
-env = ScreenSaverEnv(canvas_size=(800, 600), image_path="lebronpng.png", speed=5)
-obs, info = env.reset()
-done = False
-while not done:
-    try:
-        action = env.action_space.sample()
-        obs, reward, done, truncated, info = env.step(action)
-        env.render()
-        time.sleep(0.01)
-    except KeyboardInterrupt:
-        env.close()
+if __name__ == "__main__":
+    # Example usage
+    env = ScreenSaverEnv(canvas_size=(800, 600), image_path="lebronpng.png", speed=5)
+    obs, info = env.reset()
+    done = False
+    while not done:
+        try:
+            action = env.action_space.sample()
+            obs, reward, done, truncated, info = env.step(action)
+            env.render()
+            time.sleep(0.01)
+        except KeyboardInterrupt:
+            env.close()
 
-env.close()
+    env.close()
