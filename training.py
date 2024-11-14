@@ -40,7 +40,6 @@ def train(model, env, optimizer, gamma=0.95, resize_resolution=(64, 64), k_epoch
         # Entropy loss (encouraging exploration)
         entropy_loss = -0.001 * entropies  # Entropy loss (scaled to encourage exploration)
 
-
         # Total loss
         total_loss = policy_loss.mean() + value_loss.mean() +entropy_loss.mean()
 
