@@ -60,7 +60,7 @@ moving_scores = []  # Puntaciones moviles
 lr = 0.0001  # Learning rate
 model = FullModel()  # Initialize model (fix initialization)
 optimizer = optim.Adam(model.parameters(), lr=lr) 
-env = ScreenSaverEnv(canvas_size=(800, 600), image_path="lebronpng.png", speed=5)
+env = ScreenSaverEnv(canvas_size=(800, 600), image_path="lebronpng.png", speed=3)
 
 # Define image size for resizing
 resize_resolution = (64, 64)  # Resize the images to 64x64

@@ -7,7 +7,7 @@ import time
 from collections import deque
 
 class ScreenSaverEnv(gym.Env):
-    def __init__(self, canvas_size=(800, 600), frame_size=(100,100),image_path="path_to_image.png", speed=5):
+    def __init__(self, canvas_size=(800, 600), frame_size=(100,100),image_path="path_to_image.png", speed=3):
         super(ScreenSaverEnv, self).__init__()
         
         # Initialize canvas and image properties
@@ -86,21 +86,24 @@ class ScreenSaverEnv(gym.Env):
         spd = self.speed
         velocity = [[0, 0], [0, spd], [spd, 0], [-spd, 0], [0, -spd]]
         vel = velocity[action]
-        # Check bounds
+        # Check bounds for the image
         if self.position[0] + vel[0] <= 0 or self.position[0] + vel[0] + self.image_width >= self.canvas_width:
             vel[0] = -vel[0]
         if self.position[1] + vel[1] <= 0 or self.position[1] + vel[1] + self.image_height >= self.canvas_height:
             vel[1] = -vel[1]
+        
+        # Check bounds for the frame
         if self.frame_coords[0] + self.frame_vel[0] <= 0 or self.frame_coords[0] + self.frame_vel[0] + self.frame_size[0] >= self.canvas_width:
-            self.frame_vel[0] = -self.frame_vel[0]
+            self.frame_vel[0] = -self.frame_vel[0]  # Reverse frame's X velocity
         if self.frame_coords[1] + self.frame_vel[1] <= 0 or self.frame_coords[1] + self.frame_vel[1] + self.frame_size[1] >= self.canvas_height:
-            self.frame_vel[1] = -self.frame_vel[1]
+            self.frame_vel[1] = -self.frame_vel[1]  # Reverse frame's Y velocity
 
-        # Update position
+        # Update the image position
         np.add(self.position, self.velocity, out=self.position, casting="unsafe")
-        # Apply the velocity to the frame
-        self.frame_vel = np.array(vel) 
+        
+        # Update the frame's position based on the frame's velocity
         np.add(self.frame_coords, self.frame_vel, out=self.frame_coords, casting="unsafe")
+
         
     def _get_observation(self):
         # [Observation Format]: [Screen, Position, Velocity, Lebron Position, Lebron Velocity]
@@ -167,7 +170,7 @@ class ScreenSaverEnv(gym.Env):
 
 if __name__ == "__main__":
     # Example usage
-    env = ScreenSaverEnv(canvas_size=(800, 600), image_path="lebronpng.png", speed=5)
+    env = ScreenSaverEnv(canvas_size=(800, 600), image_path="lebronpng.png", speed=3)
     obs, info = env.reset()
     done = False
     while not done:
