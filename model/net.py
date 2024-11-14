@@ -47,7 +47,7 @@ class FullModel(nn.Module):
         # convert to tensor
         # [Batch, Height, Width, Channel] -> [Batch, Channel, Height, Width]
         image = torch.tensor(image, dtype=torch.float32).unsqueeze(0)
-        position_velocity = torch.tensor(position_velocity, dtype=torch.float32).unsqueeze(0)
+        position_velocity = torch.tensor(position_velocity, dtype=torch.float32)
         print ("image:",image.shape)
         image_features = self.cnn(image)
         print ("image feat:",image_features.shape)
