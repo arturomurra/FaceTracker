@@ -6,23 +6,13 @@ import numpy as np
 from torchvision import transforms  # Import for transformation
 from PIL import Image
 
-# # Cargamos el entorno
-print("Empezando")
-env = ScreenSaverEnv(canvas_size=(800, 600), image_path="lebronpng.png", speed=5)
-print("Cargando el modelo")
-# # Creamos la red neuronal
-model = FullModel()
-
-# # Cargamos el optimizador
-lr = 0.0001  # Learning rate
-gamma = 0.95  # Factor de descuento
-optimizer = optim.RMSprop(model.parameters(), lr=lr)  # Optimizer [RMSprop]
 
 # # Recolección de datos
 def Rollout(model, env, resize_resolution=(64, 64)):
     images = []  # List to store images
     states = []  # States (position, velocity)
     actions = []  # Actions taken by the agent
+    logs_probs = []  # Log probabilities of the actions
     rewards = []  # Rewards received
     masks = []  # Masks for episode termination
     values = []  # Value predictions from the critic
@@ -56,6 +46,7 @@ def Rollout(model, env, resize_resolution=(64, 64)):
         images.append(image_tensor)
         states.append(state_values_tensor)
         actions.append(action)
+        logs_probs.append(dist.log_prob(action))  # Log probability of the action
         rewards.append(reward)
         masks.append(mask)
         values.append(value)
@@ -69,11 +60,12 @@ def Rollout(model, env, resize_resolution=(64, 64)):
     images = torch.cat(images)  # Stack images into a tensor
     states = torch.cat(states)  # Concatenate state tensors
     actions = torch.cat(actions)  # Concatenate actions tensors
+    logs_probs = torch.cat(logs_probs)  # Concatenate log probabilities
     rewards = torch.FloatTensor(rewards)  # Convert rewards to tensor
     masks = torch.FloatTensor(masks)  # Convert masks to tensor
     values = torch.cat(values)  # Concatenate value tensors
     entropies = torch.cat(entropies)  # Concatenate entropy tensors
-    return images, states, actions, rewards, masks, values, entropies
+    return images, states, actions, logs_probs, rewards, masks, values, entropies
 
 
 

@@ -23,7 +23,7 @@ class ScreenSaverEnv(gym.Env):
         # Initialize starting position and velocity
         self.position = np.array([np.random.randint(0, self.canvas_width - self.image_width), 
                                   np.random.randint(0, self.canvas_height - self.image_height)])
-        self.velocity = np.array([speed, speed])
+        self.velocity = np.array([speed/2, speed/2])
         
         # Action space: No action needed, movement is automated
         self.action_space = spaces.Discrete(5)  # Dummy action space
@@ -48,7 +48,7 @@ class ScreenSaverEnv(gym.Env):
         # Initialize starting position and velocity
         self.position = np.array([np.random.randint(0, self.canvas_width - self.image_width), 
                                   np.random.randint(0, self.canvas_height - self.image_height)])
-        self.velocity = np.array([self.speed, self.speed])
+        self.velocity = np.array([self.speed/2, self.speed/2])
         self.counter = 0
 
         self.frame_coords = np.array([self.canvas_width//2, self.canvas_height//2])
@@ -61,8 +61,7 @@ class ScreenSaverEnv(gym.Env):
 
     def step(self, action):
         # Update position
-        self.apply_velocity()
-        self.apply_frame(action)
+        self.apply_velocity(action)
         # Calculate reward
         reward = self.get_reward()
         self.reward = reward
@@ -82,25 +81,26 @@ class ScreenSaverEnv(gym.Env):
         return self._get_observation(), reward, self.done(), False, {}
 
     # Method that apply the velocity to the position with bounce
-    def apply_velocity(self):
+    def apply_velocity(self, action):
+        # Choose the velocity
+        spd = self.speed
+        velocity = [[0, 0], [0, spd], [spd, 0], [-spd, 0], [0, -spd]]
+        vel = velocity[action]
+        # Check bounds
+        if self.position[0] + vel[0] <= 0 or self.position[0] + vel[0] + self.image_width >= self.canvas_width:
+            vel[0] = -vel[0]
+        if self.position[1] + vel[1] <= 0 or self.position[1] + vel[1] + self.image_height >= self.canvas_height:
+            vel[1] = -vel[1]
+        if self.frame_coords[0] + self.frame_vel[0] <= 0 or self.frame_coords[0] + self.frame_vel[0] + self.frame_size[0] >= self.canvas_width:
+            self.frame_vel[0] = -self.frame_vel[0]
+        if self.frame_coords[1] + self.frame_vel[1] <= 0 or self.frame_coords[1] + self.frame_vel[1] + self.frame_size[1] >= self.canvas_height:
+            self.frame_vel[1] = -self.frame_vel[1]
+
         # Update position
         np.add(self.position, self.velocity, out=self.position, casting="unsafe")
-
-    # Method that apply the frame to the position
-    def apply_frame(self, action):
-        # Move the frame coords the action
-        acelerations = [(0, 0), (0, 1), (1, 0), (-1, 0), (0, -1)]
-
-        # Add the action to the frame velocity
-        self.frame_vel = np.add(self.frame_vel, acelerations[action], casting="unsafe")
-        # Check bounds
-        if self.frame_coords[0] <= 0 or self.frame_coords[0] + self.frame_size[0] >= self.canvas_width:
-            self.frame_vel[0] = -self.frame_vel[0]
-        if self.frame_coords[1] <= 0 or self.frame_coords[1] + self.frame_size[1] >= self.canvas_height:
-            self.frame_vel[1] = -self.frame_vel[1]
-        # Update position
+        # Apply the velocity to the frame
+        self.frame_vel = np.array(vel) 
         np.add(self.frame_coords, self.frame_vel, out=self.frame_coords, casting="unsafe")
-
         
     def _get_observation(self):
         # [Observation Format]: [Screen, Position, Velocity, Lebron Position, Lebron Velocity]
@@ -116,11 +116,11 @@ class ScreenSaverEnv(gym.Env):
         self.screen.blit(text, (10, 10))
         # Get the positions and velocities
         # Get the position of the image
-        position = self.position
+        position = self.position / np.array([self.canvas_width, self.canvas_height])
         # Get the velocity of the image
         velocity = self.velocity
         # Get the position of the frame
-        frame_position = self.frame_coords
+        frame_position = self.frame_coords / np.array([self.canvas_width, self.canvas_height])
         # Get the velocity of the frame
         frame_velocity = self.frame_vel
         # Concatenate the positions and velocities
@@ -143,6 +143,7 @@ class ScreenSaverEnv(gym.Env):
         union_area = image_area + frame_area - intersection_area
         # Get the percentage of the image inside the frame
         percentage = intersection_area / union_area
+        if 
         # Return the percentage
         return percentage
     

@@ -9,35 +9,42 @@ from main import Rollout, compute_returns
 
 
 # # Cargamos el ciclo de entrenamiento
-def train(model, env, optimizer, gamma=0.95, resize_resolution=(64, 64)):
+def train(model, env, optimizer, gamma=0.95, resize_resolution=(64, 64), k_epochs=4):
     # Collect data from the environment (Rollout)
-    images, states, actions, rewards, masks, values, entropies = Rollout(model, env, resize_resolution=resize_resolution)
+    images, states, actions,old_probs, rewards, masks, values, entropies = Rollout(model, env, resize_resolution=resize_resolution)
+    old_probs = old_probs.detach()
+    values = values.detach()
+    rewards = rewards.detach()
+    actions = actions.detach()
+    entropies = entropies.detach()
+    for _ in range(k_epochs):
+        # Calculate the loss
+        dist, values = model(images, states)  # Get the distribution (policy) and values (critic)
+        
+        # Calculate returns and advantages
+        returns = compute_returns(rewards, masks, gamma)
+        returns = returns.detach()
+        returns = (returns - returns.mean())/(returns.std() + 1e-8)
+        advantages = returns - values
 
-    # Calculate the loss
-    dist, values = model(images, states)  # Get the distribution (policy) and values (critic)
-    
-    # Calculate returns and advantages
-    returns = compute_returns(rewards, masks, gamma)
-    returns = (returns - returns.mean())/(returns.std() + 1e-8)
-    advantages = returns - values
+        # Policy loss (actor)
+        log_probs = dist.log_prob(actions)  # Calculate log probability of actions
+        ratio = torch.exp(log_probs - old_probs)
+        policy_loss = -torch.min(ratio * advantages, torch.clamp(ratio, 1-0.2, 1+0.2) * advantages).mean()
 
-    # Policy loss (actor)
-    log_probs = dist.log_prob(actions)  # Calculate log probability of actions
-    policy_loss = -log_probs * advantages.detach()  # Actor loss (negative to minimize)
+        # Value loss (critic)
+        value_loss = 0.5 * (returns - values).pow(2)  # Critic loss (mean squared error)
 
-    # Value loss (critic)
-    value_loss = 0.5 * (returns - values).pow(2)  # Critic loss (mean squared error)
+        # Entropy loss (encouraging exploration)
+        entropy_loss = -0.01 * entropies  # Entropy loss (scaled to encourage exploration)
 
-    # Entropy loss (encouraging exploration)
-    entropy_loss = -0.01 * entropies  # Entropy loss (scaled to encourage exploration)
+        # Total loss
+        total_loss = policy_loss.mean() + value_loss.mean() + entropy_loss.mean()
 
-    # Total loss
-    total_loss = policy_loss.mean() + value_loss.mean() + entropy_loss.mean()
-
-    # Backpropagation and optimization
-    optimizer.zero_grad()
-    total_loss.backward()  # Compute gradients
-    optimizer.step()  # Update model parameters
+        # Backpropagation and optimization
+        optimizer.zero_grad()
+        total_loss.backward()  # Compute gradients
+        optimizer.step()  # Update model parameters
 
     return total_loss.item(), rewards
 
@@ -56,7 +63,7 @@ resize_resolution = (64, 64)  # Resize the images to 64x64
 
 for epoch in range(epochs):
     # Entrenamiento
-    loss, rewards = train(model, env, optimizer, gamma=0.99, resize_resolution=resize_resolution)
+    loss, rewards = train(model, env, optimizer, gamma=0.95, resize_resolution=resize_resolution)
 
     # Calcular la puntuacion
     score = rewards.sum()  # Calculamos la puntuacion

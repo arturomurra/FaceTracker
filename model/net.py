@@ -31,9 +31,13 @@ class SpatialNN(nn.Module):
         self.fc2 = nn.Linear(256, 128)
         self.fc3 = nn.Linear(128, 64)  # Output for x, y accelerations
         # [Actor]
-        self.actor_mu = nn.Linear(64, 4) # Capa de salida de la media
+        self.actor_fc1 = nn.Linear(64, 64) # Capa oculta
+        self.actor_fc2 = nn.Linear(64, 64) # Capa oculta
+        self.actor_mu = nn.Linear(64, 5) # Capa de salida de la media
         
         # [Critic]
+        self.critic_fc1 = nn.Linear(64, 64) # Capa oculta
+        self.critic_fc2 = nn.Linear(64, 64) # Capa oculta
         self.critic = nn.Linear(64, 1) # Capa de salida del valor
 
     def forward(self, image_features, position_velocity):
@@ -42,11 +46,15 @@ class SpatialNN(nn.Module):
         x = F.relu(self.fc2(x))
         x = F.relu(self.fc3(x))
         # Actor
-        mu = self.actor_mu(x)
+        mu = F.relu(self.actor_fc1(x))
+        mu = F.relu(self.actor_fc2(mu))
+        mu = self.actor_mu(mu)
         mu = torch.softmax(mu,dim=1)
         dist = Categorical(mu)
         # Critic
-        critic = self.critic(x)
+        critic = F.relu(self.critic_fc1(x))
+        critic = F.relu(self.critic_fc2(critic))
+        critic = self.critic(critic)
         return dist, critic
 
 # Full model combining CNN and the Spatial NN
@@ -59,8 +67,6 @@ class FullModel(nn.Module):
     def forward(self, image, position_velocity):
         # convert to tensor
         # [Batch, Height, Width, Channel] -> [Batch, Channel, Height, Width]
-        image = torch.tensor(image, dtype=torch.float32)
-        position_velocity = torch.tensor(position_velocity, dtype=torch.float32)
         image_features = self.cnn(image)
         acceleration = self.spatial_nn(image_features, position_velocity)
         return acceleration
