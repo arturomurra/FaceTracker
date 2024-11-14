@@ -143,7 +143,10 @@ class ScreenSaverEnv(gym.Env):
         union_area = image_area + frame_area - intersection_area
         # Get the percentage of the image inside the frame
         percentage = intersection_area / union_area
-        if 
+        if percentage != 0:
+            return 1
+        else:   
+            return 0
         # Return the percentage
         return percentage
     
