@@ -57,7 +57,7 @@ while not done:
         # Render the environment
         env.render()
         
-        time.sleep(0.01)  # Slow down the loop a bit
+        
         counter = counter + 1
 
     except KeyboardInterrupt:

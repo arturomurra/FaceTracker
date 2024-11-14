@@ -33,6 +33,7 @@ class ScreenSaverEnv(gym.Env):
         self.frame_size = np.array(frame_size)
         self.frame_vel = np.array([0, 0])
         self.reward = 0
+        self.counter = 0
         
         # Queue of the events
         self.events = deque(maxlen=100)
@@ -48,6 +49,7 @@ class ScreenSaverEnv(gym.Env):
                                   np.random.randint(0, self.canvas_height - self.image_height)])
         # Reset velocity
         self.velocity = np.array([np.random.choice([-1, 1]), np.random.choice([-1, 1])]) * np.linalg.norm(self.velocity)
+        self.counter = 0
 
         
         return self._get_observation(), {}
@@ -70,7 +72,9 @@ class ScreenSaverEnv(gym.Env):
         
         # No specific reward; observation only
         # [Observation, Reward, Done, Trunc, Info]
-        return self._get_observation(), reward, False, False, {}
+        self.counter += 1
+        print(f"Step #:{self.counter}")
+        return self._get_observation(), reward, self.done(), False, {}
 
     # Method that apply the velocity to the position with bounce
     def apply_velocity(self):
@@ -139,7 +143,7 @@ class ScreenSaverEnv(gym.Env):
     
     # The done function
     def done(self):
-        if np.mean(self.events) > 0.5:
+        if np.mean(self.events) > 0.5 or self.counter>=200:
             return True
         else:
             return False
