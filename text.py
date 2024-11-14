@@ -86,24 +86,21 @@ class ScreenSaverEnv(gym.Env):
         spd = self.speed
         velocity = [[0, 0], [0, spd], [spd, 0], [-spd, 0], [0, -spd]]
         vel = velocity[action]
-        # Check bounds for the image
+        # Check bounds
         if self.position[0] + vel[0] <= 0 or self.position[0] + vel[0] + self.image_width >= self.canvas_width:
             vel[0] = -vel[0]
         if self.position[1] + vel[1] <= 0 or self.position[1] + vel[1] + self.image_height >= self.canvas_height:
             vel[1] = -vel[1]
-        
-        # Check bounds for the frame
         if self.frame_coords[0] + self.frame_vel[0] <= 0 or self.frame_coords[0] + self.frame_vel[0] + self.frame_size[0] >= self.canvas_width:
-            self.frame_vel[0] = -self.frame_vel[0]  # Reverse frame's X velocity
+            self.frame_vel[0] = -self.frame_vel[0]
         if self.frame_coords[1] + self.frame_vel[1] <= 0 or self.frame_coords[1] + self.frame_vel[1] + self.frame_size[1] >= self.canvas_height:
-            self.frame_vel[1] = -self.frame_vel[1]  # Reverse frame's Y velocity
+            self.frame_vel[1] = -self.frame_vel[1]
 
-        # Update the image position
+        # Update position
         np.add(self.position, self.velocity, out=self.position, casting="unsafe")
-        
-        # Update the frame's position based on the frame's velocity
+        # Apply the velocity to the frame
+        self.frame_vel = np.array(vel) 
         np.add(self.frame_coords, self.frame_vel, out=self.frame_coords, casting="unsafe")
-
         
     def _get_observation(self):
         # [Observation Format]: [Screen, Position, Velocity, Lebron Position, Lebron Velocity]
