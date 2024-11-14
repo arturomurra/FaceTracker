@@ -13,6 +13,7 @@ class ScreenSaverEnv(gym.Env):
         # Initialize canvas and image properties
         self.canvas_width, self.canvas_height = canvas_size
         self.image = pygame.image.load(image_path)
+        self.speed = speed
         # Resize image to fit within the canvas
         resize = (100, 100)
         # Apply the resize to the image
@@ -44,11 +45,15 @@ class ScreenSaverEnv(gym.Env):
         pygame.display.set_caption("Screensaver Environment")
 
     def reset(self):
-        # Reset position to a random location
+        # Initialize starting position and velocity
         self.position = np.array([np.random.randint(0, self.canvas_width - self.image_width), 
                                   np.random.randint(0, self.canvas_height - self.image_height)])
-        # Reset velocity
-        self.velocity = np.array([np.random.choice([-1, 1]), np.random.choice([-1, 1])]) * np.linalg.norm(self.velocity)
+        self.velocity = np.array([self.speed, self.speed])
+        self.counter = 0
+
+        self.frame_coords = np.array([self.canvas_width//2, self.canvas_height//2])
+        self.frame_vel = np.array([0, 0])
+        self.reward = 0
         self.counter = 0
 
         
@@ -73,7 +78,7 @@ class ScreenSaverEnv(gym.Env):
         # No specific reward; observation only
         # [Observation, Reward, Done, Trunc, Info]
         self.counter += 1
-        print(f"Step #:{self.counter}")
+        #print(f"Step #:{self.counter}")
         return self._get_observation(), reward, self.done(), False, {}
 
     # Method that apply the velocity to the position with bounce

@@ -59,7 +59,7 @@ class FullModel(nn.Module):
     def forward(self, image, position_velocity):
         # convert to tensor
         # [Batch, Height, Width, Channel] -> [Batch, Channel, Height, Width]
-        image = torch.tensor(image, dtype=torch.float32).unsqueeze(0)
+        image = torch.tensor(image, dtype=torch.float32)
         position_velocity = torch.tensor(position_velocity, dtype=torch.float32)
         image_features = self.cnn(image)
         acceleration = self.spatial_nn(image_features, position_velocity)

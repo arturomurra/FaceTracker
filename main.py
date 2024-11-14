@@ -41,7 +41,7 @@ def Rollout(model, env, resize_resolution=(64, 64)):
         
         # Apply resizing to the image before passing it to the model
         image_resized = transform(image)  # Resize the image to smaller resolution
-        image_tensor = transforms.ToTensor()(image_resized)  # Convert resized image back to tensor
+        image_tensor = transforms.ToTensor()(image_resized).unsqueeze(0)  # Convert resized image back to tensor
 
         state_values_tensor = torch.FloatTensor(state_values).unsqueeze(0)  # Convert state values to tensor and add batch dimension
 
@@ -66,7 +66,7 @@ def Rollout(model, env, resize_resolution=(64, 64)):
             break  # End the episode if done or truncated
 
     # Convert lists to tensors
-    images = torch.stack(images)  # Stack images into a tensor
+    images = torch.cat(images)  # Stack images into a tensor
     states = torch.cat(states)  # Concatenate state tensors
     actions = torch.cat(actions)  # Concatenate actions tensors
     rewards = torch.FloatTensor(rewards)  # Convert rewards to tensor
@@ -76,16 +76,6 @@ def Rollout(model, env, resize_resolution=(64, 64)):
     return images, states, actions, rewards, masks, values, entropies
 
 
-# # Testeamos el Rollout
-images, states, actions, rewards, masks, values, entropies = Rollout(model, env, resize_resolution=(64, 64))
-
-print("Images:", images.shape)
-print("States:", states.shape)
-print("Actions:", actions.shape)
-print("Rewards:", rewards.shape)
-print("Masks:", masks.shape)
-print("Values:", values.shape)
-print("Entropies:", entropies.shape)
 
 
 # # Cargamos el ciclo de entrenamiento

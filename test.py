@@ -88,39 +88,6 @@ print("Values:", values.shape)
 print("Entropies:", entropies.shape)
 
 
-# # Cargamos el ciclo de entrenamiento
-def train(model, env, optimizer, gamma=0.95):
-    # Collect data from the environment (Rollout)
-    images, states, actions, rewards, masks, values, entropies = Rollout(model, env)
-
-    # Calculate the loss
-    dist, values = model(images, states)  # Get the distribution (policy) and values (critic)
-    
-    # Calculate returns and advantages
-    returns = compute_returns(rewards, masks, gamma)
-    advantages = returns - values
-
-    # Policy loss (actor)
-    log_probs = dist.log_prob(actions)  # Calculate log probability of actions
-    policy_loss = -log_probs * advantages.detach()  # Actor loss (negative to minimize)
-
-    # Value loss (critic)
-    value_loss = 0.5 * (returns - values).pow(2)  # Critic loss (mean squared error)
-
-    # Entropy loss (encouraging exploration)
-    entropy_loss = -0.01 * entropies  # Entropy loss (scaled to encourage exploration)
-
-    # Total loss
-    total_loss = policy_loss.mean() + value_loss.mean() + entropy_loss.mean()
-
-    # Backpropagation and optimization
-    optimizer.zero_grad()
-    total_loss.backward()  # Compute gradients
-    optimizer.step()  # Update model parameters
-
-    return total_loss.item()
-
-
 # # Computamos los retornos
 def compute_returns(rewards, masks, gamma):
     returns = torch.zeros_like(rewards)  # Initialize tensor for returns
