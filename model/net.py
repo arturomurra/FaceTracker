@@ -12,7 +12,7 @@ class ImageCNN(nn.Module):
         self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
-        self.pool = nn.MaxPool2d(4, 4)
+        self.pool = nn.MaxPool2d(2, 2)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -27,7 +27,7 @@ class ImageCNN(nn.Module):
 class SpatialNN(nn.Module):
     def __init__(self):
         super(SpatialNN, self).__init__()
-        self.fc1 = nn.Linear(13832, 256)  # CNN output + position and velocity
+        self.fc1 = nn.Linear(8200, 256)  # CNN output + position and velocity
         self.fc2 = nn.Linear(256, 128)
         self.fc3 = nn.Linear(128, 64)  # Output for x, y accelerations
         # [Actor]
@@ -61,10 +61,7 @@ class FullModel(nn.Module):
         # [Batch, Height, Width, Channel] -> [Batch, Channel, Height, Width]
         image = torch.tensor(image, dtype=torch.float32).unsqueeze(0)
         position_velocity = torch.tensor(position_velocity, dtype=torch.float32)
-        print ("image:",image.shape)
         image_features = self.cnn(image)
-        print ("image feat:",image_features.shape)
-        print ("position_velocity:",position_velocity.shape)
         acceleration = self.spatial_nn(image_features, position_velocity)
         return acceleration
     

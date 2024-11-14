@@ -1,66 +1,131 @@
-from text import ScreenSaverEnv
-from model.net import FullModel
 import torch
 import torch.optim as optim
+from model.net import FullModel
+from text import ScreenSaverEnv
 import numpy as np
-import time
+from torchvision import transforms  # Import for transformation
+from PIL import Image
 
-# Example usage
+# # Cargamos el entorno
 print("Empezando")
 env = ScreenSaverEnv(canvas_size=(800, 600), image_path="lebronpng.png", speed=5)
 print("Cargando el modelo")
+# # Creamos la red neuronal
 model = FullModel()
 
-# Define the optimizer and loss function
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-criterion = torch.nn.MSELoss()  # Loss function to minimize (Mean Squared Error for regression)
+# # Cargamos el optimizador
+lr = 0.0001  # Learning rate
+gamma = 0.95  # Factor de descuento
+optimizer = optim.RMSprop(model.parameters(), lr=lr)  # Optimizer [RMSprop]
 
-# Training loop
-obs, info = env.reset()
-done = False
-counter = 0
-while not done:
-    try:
-        # Transpose the observation to match the model input
-        image = obs[0]
-        image = np.transpose(image, (2, 0, 1))  # [Height, Width, Channel] -> [Channel, Height, Width]
-        state = obs[1]
-        
-        # Convert to tensors
-        image_tensor = torch.tensor(image, dtype=torch.float32)  # Add batch dimension
-        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)  # Add batch dimension
+# # Recolección de datos
+def Rollout(model, env, resize_resolution=(64, 64)):
+    images = []  # List to store images
+    states = []  # States (position, velocity)
+    actions = []  # Actions taken by the agent
+    rewards = []  # Rewards received
+    masks = []  # Masks for episode termination
+    values = []  # Value predictions from the critic
+    entropies = []  # Entropies of the action distributions
+    state, _ = env.reset()  # Reset environment
 
-        # Get action from the model (predicted accelerations)
-        action, log = model.get_action(image_tensor, state_tensor)
-        
-        # Take action in the environment (based on model output)
-        # In your case, we need to select the highest value from action (argmax)
-        action_taken = action  # Convert to a scalar value representing the chosen action
-        
-        # Step the environment
-        obs, reward, done, truncated, info = env.step(action_taken)
-        
-        # Calculate the loss: The target is the "correct" action, which you should define (e.g., based on image positioning)
-        target = torch.tensor([reward], dtype=torch.float32)  # Reward as the target for training
+    # Define the transform to resize the image
+    transform = transforms.Compose([
+        transforms.ToPILImage(),          # Convert tensor to PIL Image
+        transforms.Resize(resize_resolution) # Resize the image
+    ])
 
-        # Compute loss (MSE between predicted action and target)
-        loss = criterion(action[0], target)  # Compare predicted action vs. actual action
-
-        # Backpropagate the loss
-        #optimizer.zero_grad()  # Zero the gradients
-        #loss.backward()  # Compute gradients
-        #optimizer.step()  # Update the model parameters
-
-        # Print for monitoring
-        print(f"Step Reward: {reward:.2f}, Loss: {loss.item():.4f}")
+    while True:
+        image = state[0]  # Image observation from the environment
+        state_values = state[1]  # Position and velocity values
         
-        # Render the environment
-        env.render()
-        
-        
-        counter = counter + 1
+        # Apply resizing to the image before passing it to the model
+        image_resized = transform(image)  # Resize the image to smaller resolution
+        image_tensor = transforms.ToTensor()(image_resized)  # Convert resized image back to tensor
 
-    except KeyboardInterrupt:
-        env.close()
+        state_values_tensor = torch.FloatTensor(state_values).unsqueeze(0)  # Convert state values to tensor and add batch dimension
 
-env.close()
+        dist, value = model(image_tensor, state_values_tensor)  # Get the distribution (for action selection) and value from the model
+        action = dist.sample()  # Sample action based on the distribution
+        entropy = dist.entropy()  # Get the entropy of the action distribution
+        next_state, reward, done, truncated, _ = env.step(action.item())  # Take the action in the environment
+        
+        mask = 0 if done else 1  # If done, mask is 0, else 1 (for episode termination)
+        
+        # Store the data
+        images.append(image_tensor)
+        states.append(state_values_tensor)
+        actions.append(action)
+        rewards.append(reward)
+        masks.append(mask)
+        values.append(value)
+        entropies.append(entropy)
+        
+        state = next_state  # Update state
+        if done or truncated:
+            break  # End the episode if done or truncated
+
+    # Convert lists to tensors
+    images = torch.stack(images)  # Stack images into a tensor
+    states = torch.cat(states)  # Concatenate state tensors
+    actions = torch.cat(actions)  # Concatenate actions tensors
+    rewards = torch.FloatTensor(rewards)  # Convert rewards to tensor
+    masks = torch.FloatTensor(masks)  # Convert masks to tensor
+    values = torch.cat(values)  # Concatenate value tensors
+    entropies = torch.cat(entropies)  # Concatenate entropy tensors
+    return images, states, actions, rewards, masks, values, entropies
+
+
+# # Testeamos el Rollout
+images, states, actions, rewards, masks, values, entropies = Rollout(model, env, resize_resolution=(64, 64))
+
+print("Images:", images.shape)
+print("States:", states.shape)
+print("Actions:", actions.shape)
+print("Rewards:", rewards.shape)
+print("Masks:", masks.shape)
+print("Values:", values.shape)
+print("Entropies:", entropies.shape)
+
+
+# # Cargamos el ciclo de entrenamiento
+def train(model, env, optimizer, gamma=0.95):
+    # Collect data from the environment (Rollout)
+    images, states, actions, rewards, masks, values, entropies = Rollout(model, env)
+
+    # Calculate the loss
+    dist, values = model(images, states)  # Get the distribution (policy) and values (critic)
+    
+    # Calculate returns and advantages
+    returns = compute_returns(rewards, masks, gamma)
+    advantages = returns - values
+
+    # Policy loss (actor)
+    log_probs = dist.log_prob(actions)  # Calculate log probability of actions
+    policy_loss = -log_probs * advantages.detach()  # Actor loss (negative to minimize)
+
+    # Value loss (critic)
+    value_loss = 0.5 * (returns - values).pow(2)  # Critic loss (mean squared error)
+
+    # Entropy loss (encouraging exploration)
+    entropy_loss = -0.01 * entropies  # Entropy loss (scaled to encourage exploration)
+
+    # Total loss
+    total_loss = policy_loss.mean() + value_loss.mean() + entropy_loss.mean()
+
+    # Backpropagation and optimization
+    optimizer.zero_grad()
+    total_loss.backward()  # Compute gradients
+    optimizer.step()  # Update model parameters
+
+    return total_loss.item()
+
+
+# # Computamos los retornos
+def compute_returns(rewards, masks, gamma):
+    returns = torch.zeros_like(rewards)  # Initialize tensor for returns
+    future_return = 0  # Start with 0 future return
+    for t in reversed(range(len(rewards))):  # Iterate over rewards in reverse
+        future_return = rewards[t] + gamma * future_return * masks[t]  # Calculate future return with discount
+        returns[t] = future_return  # Assign the computed return for this step
+    return returns
