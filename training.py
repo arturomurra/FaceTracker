@@ -20,30 +20,35 @@ def train(model, env, optimizer, gamma=0.95, resize_resolution=(64, 64), k_epoch
     for _ in range(k_epochs):
         # Calculate the loss
         dist, values = model(images, states)  # Get the distribution (policy) and values (critic)
-        
+        values = values.squeeze()
         # Calculate returns and advantages
         returns = compute_returns(rewards, masks, gamma)
         returns = returns.detach()
-        returns = (returns - returns.mean())/(returns.std() + 1e-8)
+        returns = (returns - returns.mean()) / returns.std()
         advantages = returns - values
+
 
         # Policy loss (actor)
         log_probs = dist.log_prob(actions)  # Calculate log probability of actions
         ratio = torch.exp(log_probs - old_probs)
-        policy_loss = -torch.min(ratio * advantages, torch.clamp(ratio, 1-0.2, 1+0.2) * advantages).mean()
+        policy_loss = -torch.min(ratio * advantages, torch.clamp(ratio, 1-0.2, 1+0.2) * advantages)
+        
 
         # Value loss (critic)
-        value_loss = 0.5 * (returns - values).pow(2)  # Critic loss (mean squared error)
+        value_loss = 0.5 * advantages.pow(2)  # Critic loss (mean squared error)
 
         # Entropy loss (encouraging exploration)
-        entropy_loss = -0.01 * entropies  # Entropy loss (scaled to encourage exploration)
+        entropy_loss = -0.001 * entropies  # Entropy loss (scaled to encourage exploration)
+
 
         # Total loss
-        total_loss = policy_loss.mean() + value_loss.mean() + entropy_loss.mean()
+        total_loss = policy_loss.mean() + value_loss.mean() +entropy_loss.mean()
 
         # Backpropagation and optimization
         optimizer.zero_grad()
         total_loss.backward()  # Compute gradients
+        # Clip gradients
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
         optimizer.step()  # Update model parameters
 
     return total_loss.item(), rewards
@@ -55,7 +60,7 @@ scores = []  # Puntajes
 moving_scores = []  # Puntaciones moviles
 lr = 0.0001  # Learning rate
 model = FullModel()  # Initialize model (fix initialization)
-optimizer = optim.RMSprop(model.parameters(), lr=lr) 
+optimizer = optim.Adam(model.parameters(), lr=lr) 
 env = ScreenSaverEnv(canvas_size=(800, 600), image_path="lebronpng.png", speed=5)
 
 # Define image size for resizing

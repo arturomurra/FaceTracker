@@ -46,8 +46,8 @@ class ScreenSaverEnv(gym.Env):
 
     def reset(self):
         # Initialize starting position and velocity
-        self.position = np.array([np.random.randint(0, self.canvas_width - self.image_width), 
-                                  np.random.randint(0, self.canvas_height - self.image_height)])
+        self.position = np.array([np.random.randint(self.canvas_width//2 - self.image_width//2, self.canvas_width//2 + self.image_width//2), 
+                                    np.random.randint(self.canvas_height//2 - self.image_height//2, self.canvas_height//2 + self.image_height//2)])
         self.velocity = np.array([self.speed/2, self.speed/2])
         self.counter = 0
 
@@ -143,11 +143,7 @@ class ScreenSaverEnv(gym.Env):
         union_area = image_area + frame_area - intersection_area
         # Get the percentage of the image inside the frame
         percentage = intersection_area / union_area
-        if percentage != 0:
-            return 1
-        else:   
-            return 0
-        # Return the percentage
+
         return percentage
     
     # The done function
