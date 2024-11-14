@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
+from torch.distributions.categorical import Categorical # Distribucion normal
 
 # CNN for image feature extraction
 class ImageCNN(nn.Module):
@@ -28,13 +29,25 @@ class SpatialNN(nn.Module):
         super(SpatialNN, self).__init__()
         self.fc1 = nn.Linear(13832, 256)  # CNN output + position and velocity
         self.fc2 = nn.Linear(256, 128)
-        self.fc3 = nn.Linear(128, 4)  # Output for x, y accelerations
+        self.fc3 = nn.Linear(128, 64)  # Output for x, y accelerations
+        # [Actor]
+        self.actor_mu = nn.Linear(64, 4) # Capa de salida de la media
+        
+        # [Critic]
+        self.critic = nn.Linear(64, 1) # Capa de salida del valor
 
     def forward(self, image_features, position_velocity):
         x = torch.cat((image_features, position_velocity), dim=1)  # Concatenate features and position
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        return self.fc3(x)  # x and y acceleration outputs
+        x = F.relu(self.fc3(x))
+        # Actor
+        mu = self.actor_mu(x)
+        mu = torch.softmax(mu,dim=1)
+        dist = Categorical(mu)
+        # Critic
+        critic = self.critic(x)
+        return dist, critic
 
 # Full model combining CNN and the Spatial NN
 class FullModel(nn.Module):
@@ -54,3 +67,8 @@ class FullModel(nn.Module):
         print ("position_velocity:",position_velocity.shape)
         acceleration = self.spatial_nn(image_features, position_velocity)
         return acceleration
+    
+    def get_action(self,  image, position_velocity):
+        dist, _ = self.forward( image, position_velocity)
+        action = dist.sample()
+        return action, dist.log_prob(action) # p, log(p)

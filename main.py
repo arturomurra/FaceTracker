@@ -31,11 +31,11 @@ while not done:
         state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)  # Add batch dimension
 
         # Get action from the model (predicted accelerations)
-        action = model(image_tensor, state_tensor)
+        action, log = model.get_action(image_tensor, state_tensor)
         
         # Take action in the environment (based on model output)
         # In your case, we need to select the highest value from action (argmax)
-        action_taken = action.argmax().item()  # Convert to a scalar value representing the chosen action
+        action_taken = action  # Convert to a scalar value representing the chosen action
         
         # Step the environment
         obs, reward, done, truncated, info = env.step(action_taken)
@@ -47,9 +47,9 @@ while not done:
         loss = criterion(action[0], target)  # Compare predicted action vs. actual action
 
         # Backpropagate the loss
-        optimizer.zero_grad()  # Zero the gradients
-        loss.backward()  # Compute gradients
-        optimizer.step()  # Update the model parameters
+        #optimizer.zero_grad()  # Zero the gradients
+        #loss.backward()  # Compute gradients
+        #optimizer.step()  # Update the model parameters
 
         # Print for monitoring
         print(f"Step Reward: {reward:.2f}, Loss: {loss.item():.4f}")
