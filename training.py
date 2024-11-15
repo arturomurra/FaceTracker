@@ -97,6 +97,14 @@ plt.xlabel('Epochs')
 plt.ylabel('Total Rewards')
 plt.title('Rewards Over Time')
 plt.legend()
+
+# Save the plot as a PNG file
+plot_filename = 'rewards_plot.png'  # You can change the file name and extension as needed
+plt.savefig(plot_filename)
+
+# Show the plot
 plt.show()
+
+print(f"Plot saved as {plot_filename}")
 
 # End of training
